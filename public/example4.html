@@ -1,0 +1,51 @@
+<!DOCTYPE html PUBLIC "-//W3C//DTD HTML 4.01//EN"
+"http://www.w3.org/TR/html4/strict.dtd">
+
+<html xmlns="http://www.w3.org/1999/xhtml" lang="en">
+	<head>
+		<meta http-equiv="Content-Type" content="text/html; charset=utf-8" />
+		<title>example2</title>
+		<meta name="author" content="all" />
+	    <script src="http://d3js.org/d3.v3.min.js"></script>
+        <script src="http://d3js.org/topojson.v1.min.js"></script>
+        <script src="http://127.0.0.1:8020/20170101/public/js/map.js"></script>
+        <style>
+             svg {
+             	  background-color: lavender;
+             	  border: 1px solid black;
+             }
+             
+             path {
+             	   fill: oldlace;
+             	   stroke: #666;
+             	   stroke-width: .5px;
+             }
+             
+             
+
+</style>
+        
+    </head>
+	<body>
+		<form>
+           <input onclick="changeSize()">...</input>
+        </form>
+    <script>
+    	function changeSize() {
+    		map.recreate(2000, 800);
+    		   
+    	}
+    	
+        var width = 1600,
+            height = 800,
+            rotate = 0,        // so that [-60, 0] becomes initial center of projection
+            maxlat = 90;        // clip northern and southern poles (infinite in mercator)
+    
+        var map = new MapObject(width, height, rotate, maxlat, null);
+     
+    </script>
+
+
+	</body>
+</html>
+

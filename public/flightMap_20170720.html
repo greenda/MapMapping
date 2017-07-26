@@ -1,0 +1,283 @@
+<!DOCTYPE html PUBLIC "-//W3C//DTD HTML 4.01//EN"
+"http://www.w3.org/TR/html4/strict.dtd">
+
+<html xmlns="http://www.w3.org/1999/xhtml" lang="en">
+	<head>
+		<meta http-equiv="Content-Type" content="text/html; charset=utf-8" />
+		<title>example2</title>
+		<meta name="author" content="all" />
+		<!-- TODO упаковать в несколько файлов -->
+	    <script src="http://d3js.org/d3.v3.min.js"></script>
+        <script src="http://d3js.org/topojson.v1.min.js"></script>
+        <script src="http://d3js.org/d3-queue.v3.min.js"></script>
+        <script src="http://d3js.org/d3-ease.v1.min.js"></script>
+        <script src="http://127.0.0.1:8020/20170101/public/js/date.js"></script>
+        <script src="http://127.0.0.1:8020/20170101/public/js/airport.js"></script>
+        <script src="http://127.0.0.1:8020/20170101/public/js/airportBuilder.js"></script>
+        <script src="http://127.0.0.1:8020/20170101/public/js/airports.js"></script>
+        <script src="http://127.0.0.1:8020/20170101/public/js/airportsBuilder.js"></script>
+        <script src="http://127.0.0.1:8020/20170101/public/js/mapBuilder.js"></script>
+        <script src="http://127.0.0.1:8020/20170101/public/js/geometry.js"></script>
+        <script src="http://127.0.0.1:8020/20170101/public/js/map.js"></script>
+        <script src="http://127.0.0.1:8020/20170101/public/js/airTimer.js"></script>
+        <script src="http://127.0.0.1:8020/20170101/public/js/pageComponentsUtilit.js"></script>
+        <style>
+             svg {
+             	  background-color: lavender;
+             	  border: 1px solid black;
+             }
+             
+             path {
+             	   fill: oldlace;
+             	   stroke: #666;
+             	   stroke-width: .5px;
+             }
+             
+             .route {
+             	   fill: none;
+             	   stroke: #666;
+             	   stroke-width: .5px;
+             } 
+             
+             table#legs {
+                 font-size:12px;
+                 font-family: "Trebuchet MS", Arial, Helvetica, sans-serif;
+                 border-collapse: collapse;
+                 border-spacing: 0;
+                 width: 100%;
+             }
+
+             #legs td, #legs th {
+                border: 1px solid #ddd;
+                text-align: left;
+                padding: 4px;
+             }
+
+             tr:nth-child(even){background-color: #f2f2f2}
+
+             #legs th {
+                 padding-top: 4px;
+                 padding-bottom: 4px;
+                 background-color: #4CAF50;
+                 color: white;
+             }
+             
+             .tailTh {
+                 width:50px
+             }
+             .fromToTh {
+                 width:40px
+             } 
+             .timeTh {
+                 width:40px
+             }   
+             .toTh {
+                 width:40px
+             }   
+                      
+        </style>
+</head>
+<body onload="loadMap()">
+    <table>
+        <tr>
+            <td><div id="map"></div></td>
+            <td id="tableDiv">
+            </td>             
+        </tr>
+    </table>
+   
+    <script>
+    
+    var map;
+    var airports;
+    var tails;
+    var timeTable;    
+    var currentLegs = {};
+    
+    function createMap(callback) {  
+        var width = 800,
+            height = 400,
+            rotate = 0,        // so that [-60, 0] becomes initial center of projection
+            maxlat = 90;        // clip northern and southern poles (infinite in mercator)
+        map = new MapBuilder({"width": width, "height": height, 
+                                  "rotate": rotate, "maxlat": maxlat, "callback": function() { callback(null); }});  
+   };
+   
+   // TODO все данные загружать из внешних JSON-ов
+   function loadAirports(callback) {
+       airports = new AirportsBuilder().initFromJson(map,
+                [{id: 1, icao: "KSFO", iata: "SFO", longitude: -122.37, latitude: 37.62},
+                 {id: 2, icao: "FACT", iata: "CPT", longitude: 18.6, latitude: -33.96},
+                 {id: 3, icao: "LXGB", iata: "GIB", longitude: -5.34966 , latitude: 36.15122},
+                 {id: 4, icao: "ZSPD", iata: "PVG", longitude: 121.80, latitude: 31.14},
+                 {id: 5, icao: "PHTO", iata: "ITO", longitude: 155.2, latitude: 19.43},
+                 {id: 6, icao: "OMSJ", iata: "SHJ", longitude: 55.51, latitude: 25.32}
+                ]
+      );       
+      callback(null);      
+   };
+   
+   function addRoute() {
+      initTails();
+      setDefaultAircraftPositions();
+      timerRefresh();
+   }
+   
+   function loadTimeTable(callback) {       
+       var myDateTimeNow = getDateFromFormat(document.getElementById("date").value, DATE_FORMAT);
+                
+       timeTable = [
+           {"id": 1, "tail": 1, "airportFromId": 1, 
+            "airportToId": 2, "timeFrom": "01.01.2000 06:00", 
+            "timeTo": "01.01.2000 12:00"},
+           {"id": 2, "tail": 1, "airportFromId": 2, 
+            "airportToId": 3, "timeFrom": "01.01.2000 13:00", 
+            "timeTo": "01.01.2000 18:00"},
+           {"id": 3, "tail": 1, "airportFromId": 3, 
+            "airportToId": 5, "timeFrom": "01.01.2000 19:00", 
+            "timeTo": "02.01.2000 10:00"},
+           {"id": 4, "tail": 1, "airportFromId": 5, 
+            "airportToId": 4, "timeFrom": "02.01.2000 11:00", 
+            "timeTo": "02.01.2000 15:00"}
+       ];
+       
+       showTableFromJson(timeTable, ["id", "tail", "airportFromId", "airportToId", "timeFrom", "timeTo"], "tableDiv", "legs");
+	   callback(null);
+   }
+   
+   function timerRefresh() {
+   var tailUsing = {};
+   
+    for (var i = 0; i < timeTable.length; i++) {
+          var leg1 = timeTable[i];          
+          var currentDate = getDateFromFormat(document.getElementById("date").value, DATE_FORMAT);
+          var dateFrom = getDateFromFormat(leg1.timeFrom, DATE_FORMAT);
+          var dateTo = getDateFromFormat(leg1.timeTo, DATE_FORMAT);  
+          var geometryUtils = new GeometryUtils();
+          
+          var row = d3.select("#leg_row_" + leg1.id);
+          
+          if (currentDate < dateFrom) {
+              // убираем перелет с карты
+              if (currentLegs[leg1.id]) {
+                 changeComponentStyle("#leg_row_" + leg1.id, null);                 
+                 removeComponent("#leg_geom_" + leg1.id);
+                 delete currentLegs[leg1.id];                  
+              }
+          }
+          
+          // если данный перелет выполняется в текущее время
+          if (((dateFrom - 60*60*1000) <= currentDate) && (dateTo >= currentDate)) {  
+              if (!currentLegs[leg1.id]) {      
+                  // показываем маршрут за час до начала перелета  
+                  var airport1 = airports.findAirportById(leg1.airportFromId);
+                  var airport2 = airports.findAirportById(leg1.airportToId);              
+                  var legGeom = geometryUtils
+                                   .addLegOnMap(map, map.getSVGComponent(), airport1, airport2)
+                                   .attr("id", "leg_geom_" + leg1.id);                       
+              }
+              
+              var leg = d3.select("#leg_geom_" + leg1.id)[0][0];
+              var legLength = leg.getTotalLength();
+              currentLegs[leg1.id] = leg;
+              
+              row.attr("style", "background: #59ceaf");                
+          
+              if ((currentDate >= dateFrom) && (currentDate <= dateTo)) {            
+                  var delta = (currentDate - dateFrom) / (dateTo - dateFrom) ;          
+                  var aircraftPosition = leg.getPointAtLength(legLength * delta);  
+                 row.attr("style", "background: #4CAF94");
+                 geometryUtils.movePoint("#tail_" + tails[leg1.tail].tail, timeStep, 
+                                         aircraftPosition.x, aircraftPosition.y);
+                 tailUsing[leg1.tail] = true;  
+              }
+          }
+          
+          if ((currentDate > dateTo) && (currentDate <= (dateTo + 60*60*1000))) {
+              row.attr("style", "background: #419680");   
+          }
+              
+          if (currentDate > (dateTo + 60*60*1000)) {
+              if (!tailUsing[leg1.tail]) {
+                      var airport2 = airports.findAirportById(leg1.airportToId);
+                      geometryUtils.projectAndMovePoint(map.getProjection(), "#tail_" + tails[leg1.tail].tail, timeStep, 
+                                                        airport2.longitude, airport2.latitude);                      
+              }   
+              // убираем перелет с карты
+              if (currentLegs[leg1.id]) {
+                 changeComponentStyle("#leg_row_" + leg1.id, null);                 
+                 removeComponent("#leg_geom_" + leg1.id);
+                 delete currentLegs[leg1.id];                                
+              }              
+          }  
+      }
+   }
+   
+   function initTails() {
+      tails = {"1": {"id": 1, "tail": "0001", "type": "An-124", "speed": "700"}, 
+               "2": {"id": 2, "tail": "0002", "type": "Il-76", "speed": "600"}};
+      var tail;         
+      for (var i in tails) {
+          tail = tails[i];
+          var geometryUtils = new GeometryUtils();
+          geometryUtils.addProjectedPointOnMap(map.getProjection(), map.getSVGComponent(),
+                                          {longitude: 0, 
+                                           latitude: 0},
+                                           "tail_" + tail.tail);  
+      }         
+   }
+   
+   /** 
+    * Функция создана в связи с проблемой первоначального положения ВС
+    * (для случаев, когда еще ни один перелет из расписания не выполнен).
+    * В будующем заменить на загружаемые значения положения ВС по умолчанию.
+    */   
+   function setDefaultAircraftPositions() {
+       var tail;
+       var leg;
+       var isUsed;
+       for (var i in tails) {
+           isUsed = false;
+           tail = tails[i];
+           for (var j in timeTable) {
+               leg = timeTable[j];
+               if (leg.tail === tail.id) {
+                  isUsed = true;
+                  
+                  var airport1 = airports.findAirportById(leg.airportFromId); 
+                      d3.select("#tail_" + tails[leg.tail].tail)
+                        .attr("cx", map.getProjection()([airport1.longitude, airport1.latitude])[0])
+                        .attr("cy", map.getProjection()([airport1.longitude, airport1.latitude])[1]);
+                  break;
+               }                  
+           }
+       }      
+   }   
+   
+   function loadMap() {   
+       var createMapQueue = d3.queue();
+       createMapQueue.defer(createMap);     
+       createMapQueue.await(function(error) {
+           var loadDateQueue = d3.queue();
+           loadDateQueue.defer(loadAirports);
+           loadDateQueue.defer(loadTimeTable);
+           loadDateQueue.await(function(error) {
+               addRoute();
+           });     
+       });     
+   }
+        
+    </script>    
+    <input value="setPosition" type="button" onclick="timerRefresh()"/>
+    <input value="start" type="button" onclick="startTimeout()"/>
+    <input value="stop" type="button" onclick="stopTimeout()"/>
+    <input value="firstSpeed" type="button" onclick="firstSpeed()"/>
+    <input value="secondSpeed" type="button" onclick="secondSpeed()"/>
+    <input value="thirdSpeed" type="button" onclick="thirdSpeed()"/>
+    <input id="date" onfocusout="changeCurrentTime()" value="01.01.2000 10:00"/>
+    <input id="startPeriodDate" value="01.01.2000 00:00"/>
+    <input id="slider" type="range" min="0" max="100" step="1" value="50" onchange="changeCurrentTimeSlider()" >
+    <input id="endPeriodDate" value="04.01.2000 00:00"/>
+    </body>
+</html>
+
